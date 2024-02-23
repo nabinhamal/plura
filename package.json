@@ -7,7 +7,6 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
-    
   },
   "dependencies": {
     "@clerk/nextjs": "^4.29.1",
@@ -54,7 +53,7 @@
     "date-fns": "^3.0.6",
     "embla-carousel-react": "^8.0.0-rc17",
     "lucide-react": "^0.303.0",
-    "next": "14.0.4",
+    "next": "latest",
     "next-themes": "^0.2.1",
     "prisma": "^5.7.1",
     "react": "^18",
