@@ -3,11 +3,13 @@
 import { currentUser } from '@clerk/nextjs'
 import { redirect } from 'next/navigation'
 import React from 'react'
-import Unauthorized from '../../../../components/unauthorized'
-import { getNotificationAndUser, verifyAndAcceptInvitation } from '../../../../lib/queries'
-import Sidebar from '../../../../components/sidebar'
-import InfoBar from './../../../../components/global/infobar';
-import BlurPage from './../../../../components/global/blur-page';
+
+import Sidebar from '@/components/sidebar'
+import InfoBar from '@/components/global/infobar'
+import BlurPage from '@/components/global/blur-page'
+import Unauthorized from '@/components/unauthorized'
+import { getNotificationAndUser, verifyAndAcceptInvitation } from '@/lib/queries'
+
 
 type Props = {
   children: React.ReactNode
