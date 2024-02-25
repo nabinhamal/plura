@@ -1,5 +1,5 @@
 'use client'
-import { NotificationWithUser } from '@/lib/types'
+
 import { UserButton } from '@clerk/nextjs'
 import React, { useState } from 'react'
 import { twMerge } from 'tailwind-merge'
@@ -17,6 +17,7 @@ import { Card } from '../ui/card'
 import { Switch } from '../ui/switch'
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar'
 import { ModeToggle } from './mode-toggle'
+import { NotificationWithUser } from '@/lib/types';
 
 type Props = {
   notifications: NotificationWithUser | []
