@@ -148,8 +148,10 @@ const AgencyDetails = ({ data }: Props) => {
       toast({
         title: 'Created Agency',
       })
+   
       
         return router.refresh()
+      
       }
     
     } catch (error) {
