@@ -11,7 +11,7 @@ generator client {
 datasource db {
   provider = "mysql"
   url      = env("DATABASE_URL")
-  relationMode = "foreignKeys"
+  relationMode = "prisma"
 }
 
 
@@ -87,7 +87,7 @@ model Permissions {
 model Agency {
   id               String                @id @default(uuid())
   connectAccountId String?               @default("")
-
+  customerId       String                @default("")
   name             String
   agencyLogo       String                @db.Text
   companyEmail     String                @db.Text

@@ -37,6 +37,7 @@ import {
 import { useToast } from '../ui/use-toast'
 
 import * as z from 'zod'
+import FileUpload from '../global/file-upload'
 import { Input } from '../ui/input'
 import { Switch } from '../ui/switch'
 import {
@@ -47,9 +48,7 @@ import {
   upsertAgency,
 } from '@/lib/queries'
 import { Button } from '../ui/button'
-import FileUpload from '../global/file-upload'
 import Loading from '../global/loading'
-
 
 type Props = {
   data?: Partial<Agency>
@@ -123,13 +122,24 @@ const AgencyDetails = ({ data }: Props) => {
           },
         }
 
+        const customerResponse = await fetch('/api/stripe/create-customer', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(bodyData),
+        })
+        const customerData: { customerId: string } =
+          await customerResponse.json()
+        custId = customerData.customerId
       }
-    
+
       newUserData = await initUser({ role: 'AGENCY_OWNER' })
-      if (!data?.id ) 
-{
+      if (!data?.customerId && !custId) return
+
       const response = await upsertAgency({
         id: data?.id ? data.id : v4(),
+        customerId: data?.customerId || custId || '',
         address: values.address,
         agencyLogo: values.agencyLogo,
         city: values.city,
@@ -148,12 +158,10 @@ const AgencyDetails = ({ data }: Props) => {
       toast({
         title: 'Created Agency',
       })
-   
-      
+      if (data?.id) return router.refresh()
+      if (response) {
         return router.refresh()
-      
       }
-    
     } catch (error) {
       console.log(error)
       toast({
