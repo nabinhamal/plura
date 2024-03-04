@@ -1,4 +1,3 @@
-
 import {
   Contact,
   Lane,
@@ -12,14 +11,16 @@ import {
 import {
   _getTicketsWithAllRelations,
   getAuthUserDetails,
+  getFunnels,
   getMedia,
   getPipelineDetails,
   getTicketsWithTags,
   getUserPermissions,
 } from './queries'
-import { db } from './db';
-import { z } from 'zod';
+import { db } from './db'
+import { z } from 'zod'
 
+import Stripe from 'stripe'
 
 export type NotificationWithUser =
   | ({
@@ -36,39 +37,38 @@ export type NotificationWithUser =
     } & Notification)[]
   | undefined
 
-
-  export type UserWithPermissionsAndSubAccounts = Prisma.PromiseReturnType<
+export type UserWithPermissionsAndSubAccounts = Prisma.PromiseReturnType<
   typeof getUserPermissions
 >
 
+export const FunnelPageSchema = z.object({
+  name: z.string().min(1),
+  pathName: z.string().optional(),
+})
+
+const __getUsersWithAgencySubAccountPermissionsSidebarOptions = async (
+  agencyId: string
+) => {
+  return await db.user.findFirst({
+    where: { Agency: { id: agencyId } },
+    include: {
+      Agency: { include: { SubAccount: true } },
+      Permissions: { include: { SubAccount: true } },
+    },
+  })
+}
 
 export type AuthUserWithAgencySigebarOptionsSubAccounts =
   Prisma.PromiseReturnType<typeof getAuthUserDetails>
 
-
-  const __getUsersWithAgencySubAccountPermissionsSidebarOptions = async (
-    agencyId: string
-  ) => {
-    return await db.user.findFirst({
-      where: { Agency: { id: agencyId } },
-      include: {
-        Agency: { include: { SubAccount: true } },
-        Permissions: { include: { SubAccount: true } },
-      },
-    })
-  }
-
-
-  export type UsersWithAgencySubAccountPermissionsSidebarOptions =
+export type UsersWithAgencySubAccountPermissionsSidebarOptions =
   Prisma.PromiseReturnType<
     typeof __getUsersWithAgencySubAccountPermissionsSidebarOptions
   >
 
-
-  export type GetMediaFiles = Prisma.PromiseReturnType<typeof getMedia>
+export type GetMediaFiles = Prisma.PromiseReturnType<typeof getMedia>
 
 export type CreateMediaType = Prisma.MediaCreateWithoutSubaccountInput
-
 
 export type TicketAndTags = Ticket & {
   Tags: Tag[]
@@ -114,3 +114,36 @@ export const TicketFormSchema = z.object({
 export type TicketDetails = Prisma.PromiseReturnType<
   typeof _getTicketsWithAllRelations
 >
+
+export const ContactUserFormSchema = z.object({
+  name: z.string().min(1, 'Required'),
+  email: z.string().email(),
+})
+
+export type Address = {
+  city: string
+  country: string
+  line1: string
+  postal_code: string
+  state: string
+}
+
+export type ShippingInfo = {
+  address: Address
+  name: string
+}
+
+export type StripeCustomerType = {
+  email: string
+  name: string
+  shipping: ShippingInfo
+  address: Address
+}
+
+export type PricesList = Stripe.ApiList<Stripe.Price>
+
+export type FunnelsForSubAccount = Prisma.PromiseReturnType<
+  typeof getFunnels
+>[0]
+
+export type UpsertFunnelPage = Prisma.FunnelPageCreateWithoutFunnelInput

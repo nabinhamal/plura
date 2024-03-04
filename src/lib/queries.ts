@@ -1,4 +1,4 @@
-"use server"
+'use server'
 
 import { clerkClient, currentUser } from '@clerk/nextjs'
 import { db } from './db'
@@ -17,128 +17,130 @@ import {
 import { v4 } from 'uuid'
 import {
   CreateFunnelFormSchema,
-  CreateMediaType
+  CreateMediaType,
+  UpsertFunnelPage,
 } from './types'
 import { z } from 'zod'
+import { revalidatePath } from 'next/cache'
 
 export const getAuthUserDetails = async () => {
-    const user = await currentUser()
-    if (!user) {
-      return
-    }
+  const user = await currentUser()
+  if (!user) {
+    return
+  }
 
-    const userData = await db.user.findUnique({
-        where: {
-          email: user.emailAddresses[0].emailAddress,
-        },
+  const userData = await db.user.findUnique({
+    where: {
+      email: user.emailAddresses[0].emailAddress,
+    },
+    include: {
+      Agency: {
         include: {
-          Agency: {
+          SidebarOption: true,
+          SubAccount: {
             include: {
               SidebarOption: true,
-              SubAccount: {
-                include: {
-                  SidebarOption: true,
-                },
-              },
             },
           },
-          Permissions: true,
         },
-      })
-    
-      return userData
+      },
+      Permissions: true,
+    },
+  })
+
+  return userData
+}
+
+export const saveActivityLogsNotification = async ({
+  agencyId,
+  description,
+  subaccountId,
+}: {
+  agencyId?: string
+  description: string
+  subaccountId?: string
+}) => {
+  const authUser = await currentUser()
+  let userData
+  if (!authUser) {
+    const response = await db.user.findFirst({
+      where: {
+        Agency: {
+          SubAccount: {
+            some: { id: subaccountId },
+          },
+        },
+      },
+    })
+    if (response) {
+      userData = response
     }
+  } else {
+    userData = await db.user.findUnique({
+      where: { email: authUser?.emailAddresses[0].emailAddress },
+    })
+  }
 
-    export const saveActivityLogsNotification = async ({
-        agencyId,
-        description,
-        subaccountId,
-      }: {
-        agencyId?: string
-        description: string
-        subaccountId?: string
-      }) => {
-        const authUser = await currentUser()
-        let userData
-        if (!authUser) {
-          const response = await db.user.findFirst({
-            where: {
-              Agency: {
-                SubAccount: {
-                  some: { id: subaccountId },
-                },
-              },
-            },
-          })
-          if (response) {
-            userData = response
-          }
-        } else {
-          userData = await db.user.findUnique({
-            where: { email: authUser?.emailAddresses[0].emailAddress },
-          })
-        }
-      
-        if (!userData) {
-          console.log('Could not find a user')
-          return
-        }
-      
-        let foundAgencyId = agencyId
-        if (!foundAgencyId) {
-          if (!subaccountId) {
-            throw new Error(
-              'You need to provide atleast an agency Id or subaccount Id'
-            )
-          }
-          const response = await db.subAccount.findUnique({
-            where: { id: subaccountId },
-          })
-          if (response) foundAgencyId = response.agencyId
-        }
-        if (subaccountId) {
-          await db.notification.create({
-            data: {
-              notification: `${userData.name} | ${description}`,
-              User: {
-                connect: {
-                  id: userData.id,
-                },
-              },
-              Agency: {
-                connect: {
-                  id: foundAgencyId,
-                },
-              },
-              SubAccount: {
-                connect: { id: subaccountId },
-              },
-            },
-          })
-        } else {
-          await db.notification.create({
-            data: {
-              notification: `${userData.name} | ${description}`,
-              User: {
-                connect: {
-                  id: userData.id,
-                },
-              },
-              Agency: {
-                connect: {
-                  id: foundAgencyId,
-                },
-              },
-            },
-          })
-        }
-      }
+  if (!userData) {
+    console.log('Could not find a user')
+    return
+  }
 
-    export const createTeamUser = async (agencyId: string, user: User) => {
-        if (user.role === 'AGENCY_OWNER') return null
-        const response = await db.user.create({ data: { ...user } })
-        return response
-      }
+  let foundAgencyId = agencyId
+  if (!foundAgencyId) {
+    if (!subaccountId) {
+      throw new Error(
+        'You need to provide atleast an agency Id or subaccount Id'
+      )
+    }
+    const response = await db.subAccount.findUnique({
+      where: { id: subaccountId },
+    })
+    if (response) foundAgencyId = response.agencyId
+  }
+  if (subaccountId) {
+    await db.notification.create({
+      data: {
+        notification: `${userData.name} | ${description}`,
+        User: {
+          connect: {
+            id: userData.id,
+          },
+        },
+        Agency: {
+          connect: {
+            id: foundAgencyId,
+          },
+        },
+        SubAccount: {
+          connect: { id: subaccountId },
+        },
+      },
+    })
+  } else {
+    await db.notification.create({
+      data: {
+        notification: `${userData.name} | ${description}`,
+        User: {
+          connect: {
+            id: userData.id,
+          },
+        },
+        Agency: {
+          connect: {
+            id: foundAgencyId,
+          },
+        },
+      },
+    })
+  }
+}
+
+export const createTeamUser = async (agencyId: string, user: User) => {
+  if (user.role === 'AGENCY_OWNER') return null
+  const response = await db.user.create({ data: { ...user } })
+  return response
+}
 
 export const verifyAndAcceptInvitation = async () => {
   const user = await currentUser()
@@ -429,7 +431,6 @@ export const changeUserPermissions = async (
   }
 }
 
-
 export const getSubaccountDetails = async (subaccountId: string) => {
   const response = await db.subAccount.findUnique({
     where: {
@@ -687,6 +688,220 @@ export const _getTicketsWithAllRelations = async (laneId: string) => {
       Customer: true,
       Lane: true,
       Tags: true,
+    },
+  })
+  return response
+}
+
+export const getSubAccountTeamMembers = async (subaccountId: string) => {
+  const subaccountUsersWithAccess = await db.user.findMany({
+    where: {
+      Agency: {
+        SubAccount: {
+          some: {
+            id: subaccountId,
+          },
+        },
+      },
+      role: 'SUBACCOUNT_USER',
+      Permissions: {
+        some: {
+          subAccountId: subaccountId,
+          access: true,
+        },
+      },
+    },
+  })
+  return subaccountUsersWithAccess
+}
+
+export const searchContacts = async (searchTerms: string) => {
+  const response = await db.contact.findMany({
+    where: {
+      name: {
+        contains: searchTerms,
+      },
+    },
+  })
+  return response
+}
+
+export const upsertTicket = async (
+  ticket: Prisma.TicketUncheckedCreateInput,
+  tags: Tag[]
+) => {
+  let order: number
+  if (!ticket.order) {
+    const tickets = await db.ticket.findMany({
+      where: { laneId: ticket.laneId },
+    })
+    order = tickets.length
+  } else {
+    order = ticket.order
+  }
+
+  const response = await db.ticket.upsert({
+    where: {
+      id: ticket.id || v4(),
+    },
+    update: { ...ticket, Tags: { set: tags } },
+    create: { ...ticket, Tags: { connect: tags }, order },
+    include: {
+      Assigned: true,
+      Customer: true,
+      Tags: true,
+      Lane: true,
+    },
+  })
+
+  return response
+}
+
+export const deleteTicket = async (ticketId: string) => {
+  const response = await db.ticket.delete({
+    where: {
+      id: ticketId,
+    },
+  })
+
+  return response
+}
+
+export const upsertTag = async (
+  subaccountId: string,
+  tag: Prisma.TagUncheckedCreateInput
+) => {
+  const response = await db.tag.upsert({
+    where: { id: tag.id || v4(), subAccountId: subaccountId },
+    update: tag,
+    create: { ...tag, subAccountId: subaccountId },
+  })
+
+  return response
+}
+
+export const getTagsForSubaccount = async (subaccountId: string) => {
+  const response = await db.subAccount.findUnique({
+    where: { id: subaccountId },
+    select: { Tags: true },
+  })
+  return response
+}
+
+export const deleteTag = async (tagId: string) => {
+  const response = await db.tag.delete({ where: { id: tagId } })
+  return response
+}
+
+export const upsertContact = async (
+  contact: Prisma.ContactUncheckedCreateInput
+) => {
+  const response = await db.contact.upsert({
+    where: { id: contact.id || v4() },
+    update: contact,
+    create: contact,
+  })
+  return response
+}
+
+export const getFunnels = async (subacountId: string) => {
+  const funnels = await db.funnel.findMany({
+    where: { subAccountId: subacountId },
+    include: { FunnelPages: true },
+  })
+
+  return funnels
+}
+
+export const getFunnel = async (funnelId: string) => {
+  const funnel = await db.funnel.findUnique({
+    where: { id: funnelId },
+    include: {
+      FunnelPages: {
+        orderBy: {
+          order: 'asc',
+        },
+      },
+    },
+  })
+
+  return funnel
+}
+
+export const updateFunnelProducts = async (
+  products: string,
+  funnelId: string
+) => {
+  const data = await db.funnel.update({
+    where: { id: funnelId },
+    data: { liveProducts: products },
+  })
+  return data
+}
+
+export const upsertFunnelPage = async (
+  subaccountId: string,
+  funnelPage: UpsertFunnelPage,
+  funnelId: string
+) => {
+  if (!subaccountId || !funnelId) return
+  const response = await db.funnelPage.upsert({
+    where: { id: funnelPage.id || '' },
+    update: { ...funnelPage },
+    create: {
+      ...funnelPage,
+      content: funnelPage.content
+        ? funnelPage.content
+        : JSON.stringify([
+            {
+              content: [],
+              id: '__body',
+              name: 'Body',
+              styles: { backgroundColor: 'white' },
+              type: '__body',
+            },
+          ]),
+      funnelId,
+    },
+  })
+
+  revalidatePath(`/subaccount/${subaccountId}/funnels/${funnelId}`, 'page')
+  return response
+}
+
+export const deleteFunnelePage = async (funnelPageId: string) => {
+  const response = await db.funnelPage.delete({ where: { id: funnelPageId } })
+
+  return response
+}
+
+export const getFunnelPageDetails = async (funnelPageId: string) => {
+  const response = await db.funnelPage.findUnique({
+    where: {
+      id: funnelPageId,
+    },
+  })
+
+  return response
+}
+
+export const getDomainContent = async (subDomainName: string) => {
+  const response = await db.funnel.findUnique({
+    where: {
+      subDomainName,
+    },
+    include: { FunnelPages: true },
+  })
+  return response
+}
+
+export const getPipelines = async (subaccountId: string) => {
+  const response = await db.pipeline.findMany({
+    where: { subAccountId: subaccountId },
+    include: {
+      Lane: {
+        include: { Tickets: true },
+      },
     },
   })
   return response
